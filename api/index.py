@@ -1,10 +1,10 @@
-from flask import Flask, render_template_string
+from http.server import BaseHTTPRequestHandler
 import os
 
-app = Flask(__name__)
-
-# HTML template for the main page
-INDEX_HTML = """
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Read the HTML file
+        html_content = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -107,12 +107,9 @@ INDEX_HTML = """
     </script>
 </body>
 </html>
-"""
-
-@app.route('/')
-def index():
-    return render_template_string(INDEX_HTML)
-
-# For Vercel
-def handler(request):
-    return app(request.environ, lambda *args: None)
+        """
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(html_content.encode())
