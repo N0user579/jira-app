@@ -1,0 +1,118 @@
+from flask import Flask, render_template_string
+import os
+
+app = Flask(__name__)
+
+# HTML template for the main page
+INDEX_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira BA Assistant</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-tasks"></i>
+                <span>Jira BA Assistant</span>
+            </div>
+            <div class="nav-links">
+                <a href="/">
+                    <i class="fas fa-home"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <h1>Business Analyst Dashboard</h1>
+                <p>Loading your Jira projects...</p>
+            </div>
+            <div id="projects-container" class="projects-grid">
+                <!-- Projects will be loaded here -->
+            </div>
+            <div id="loading" class="empty-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <h3>Loading Projects...</h3>
+                <p>Please wait while we fetch your Jira projects.</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/main.js"></script>
+    <script>
+        // Load projects on page load
+        document.addEventListener('DOMContentLoaded', loadProjects);
+        
+        async function loadProjects() {
+            try {
+                const response = await fetch('/api/projects');
+                const projects = await response.json();
+                
+                const container = document.getElementById('projects-container');
+                const loading = document.getElementById('loading');
+                
+                if (projects.length === 0) {
+                    loading.innerHTML = `
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>No Projects Found</h3>
+                        <p>Please check your Jira configuration and ensure you have access to projects.</p>
+                    `;
+                    return;
+                }
+                
+                loading.style.display = 'none';
+                
+                projects.forEach(project => {
+                    const projectCard = document.createElement('div');
+                    projectCard.className = 'project-card';
+                    projectCard.innerHTML = `
+                        <div class="project-icon">
+                            ${project.avatarUrls && project.avatarUrls['48x48'] 
+                                ? `<img src="${project.avatarUrls['48x48']}" alt="${project.name}">`
+                                : '<i class="fas fa-project-diagram"></i>'
+                            }
+                        </div>
+                        <div class="project-info">
+                            <h3>${project.name}</h3>
+                            <p>${project.key}</p>
+                            <small>${project.projectTypeKey ? project.projectTypeKey.charAt(0).toUpperCase() + project.projectTypeKey.slice(1) : 'Project'}</small>
+                        </div>
+                        <div class="project-actions">
+                            <a href="/project.html?key=${project.key}&name=${encodeURIComponent(project.name)}" 
+                               class="btn btn-primary">
+                                <i class="fas fa-arrow-right"></i> Open Project
+                            </a>
+                        </div>
+                    `;
+                    container.appendChild(projectCard);
+                });
+                
+            } catch (error) {
+                console.error('Error loading projects:', error);
+                document.getElementById('loading').innerHTML = `
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <h3>Error Loading Projects</h3>
+                    <p>Please check your configuration and try again.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    return render_template_string(INDEX_HTML)
+
+# For Vercel
+def handler(request):
+    return app(request.environ, lambda *args: None)
