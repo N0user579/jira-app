@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project_name }} - Jira BA Assistant{% endblock %}
+
+{% block content %}
+<div class="project-dashboard">
+    <div class="project-header">
+        <div class="project-title">
+            <h1>{{ project_name }}</h1>
+            <span class="project-key">{{ project_key }}</span>
+        </div>
+        <div class="project-actions">
+            <button class="btn btn-primary" onclick="openModal('storyModal')">
+                <i class="fas fa-plus"></i> Create User Story
+            </button>
+            <button class="btn btn-secondary" onclick="openModal('epicModal')">
+                <i class="fas fa-plus"></i> Create Epic
+            </button>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <!-- AI Generation Panel -->
+        <div class="panel ai-panel">
+            <h3><i class="fas fa-robot"></i> AI Assistant</h3>
+            <div class="ai-options">
+                <button class="btn btn-outline" onclick="showStoryGenerator()">
+                    <i class="fas fa-magic"></i> Generate User Story
+                </button>
+                <button class="btn btn-outline" onclick="showEpicGenerator()">
+                    <i class="fas fa-magic"></i> Generate Epic
+                </button>
+            </div>
+            
+            <div id="aiGenerator" class="ai-generator" style="display: none;">
+                <div class="form-group">
+                    <label for="aiInput">Requirements/Theme:</label>
+                    <textarea id="aiInput" placeholder="Describe your requirements or theme..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiContext">Additional Context:</label>
+                    <textarea id="aiContext" placeholder="Any additional context or objectives..."></textarea>
+                </div>
+                <button id="generateBtn" class="btn btn-primary">
+                    <i class="fas fa-magic"></i> Generate
+                </button>
+                <div id="aiResult" class="ai-result"></div>
+            </div>
+        </div>
+
+        <!-- Recent Issues -->
+        <div class="panel issues-panel">
+            <h3><i class="fas fa-list"></i> Recent Issues</h3>
+            <div class="issues-list">
+                {% for issue in issues[:10] %}
+                <div class="issue-item">
+                    <div class="issue-type">
+                        <i class="fas fa-{{ 'flag' if issue.fields.issuetype.name == 'Epic' else 'bookmark' }}"></i>
+                        {{ issue.fields.issuetype.name }}
+                    </div>
+                    <div class="issue-summary">
+                        <strong>{{ issue.key }}</strong>: {{ issue.fields.summary }}
+                    </div>
+                    <div class="issue-meta">
+                        <span class="status">{{ issue.fields.status.name }}</span>
+                        {% if issue.fields.assignee %}
+                        <span class="assignee">{{ issue.fields.assignee.displayName }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Story Modal -->
+<div id="storyModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create User Story</h3>
+            <span class="close" onclick="closeModal('storyModal')">&times;</span>
+        </div>
+        <form id="storyForm">
+            <div class="form-group">
+                <label for="storySummary">Summary:</label>
+                <input type="text" id="storySummary" required>
+            </div>
+            <div class="form-group">
+                <label for="storyDescription">Description:</label>
+                <textarea id="storyDescription" rows="6" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="storyAssignee">Assignee:</label>
+                <select id="storyAssignee">
+                    <option value="">Unassigned</option>
+                    {% for user in users %}
+                    <option value="{{ user.accountId }}">{{ user.displayName }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('storyModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Story</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Epic Modal -->
+<div id="epicModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create Epic</h3>
+            <span class="close" onclick="closeModal('epicModal')">&times;</span>
+        </div>
+        <form id="epicForm">
+            <div class="form-group">
+                <label for="epicSummary">Epic Name:</label>
+                <input type="text" id="epicSummary" required>
+            </div>
+            <div class="form-group">
+                <label for="epicDescription">Description:</label>
+                <textarea id="epicDescription" rows="6" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="epicAssignee">Epic Owner:</label>
+                <select id="epicAssignee">
+                    <option value="">Unassigned</option>
+                    {% for user in users %}
+                    <option value="{{ user.accountId }}">{{ user.displayName }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('epicModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Epic</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const projectKey = '{{ project_key }}';
+    
+    // AI Generation
+    let currentGenerationType = '';
+    
+    function showStoryGenerator() {
+        currentGenerationType = 'story';
+        document.getElementById('aiGenerator').style.display = 'block';
+        document.getElementById('aiInput').placeholder = 'Describe the user requirements and functionality needed...';
+        document.getElementById('aiContext').placeholder = 'Additional context about the user, system, or business goals...';
+    }
+    
+    function showEpicGenerator() {
+        currentGenerationType = 'epic';
+        document.getElementById('aiGenerator').style.display = 'block';
+        document.getElementById('aiInput').placeholder = 'Describe the epic theme or high-level feature...';
+        document.getElementById('aiContext').placeholder = 'Business objectives and success criteria...';
+    }
+    
+    document.getElementById('generateBtn').addEventListener('click', async function() {
+        const input = document.getElementById('aiInput').value;
+        const context = document.getElementById('aiContext').value;
+        const resultDiv = document.getElementById('aiResult');
+        
+        if (!input.trim()) {
+            alert('Please provide requirements or theme');
+            return;
+        }
+        
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+        resultDiv.innerHTML = '';
+        
+        try {
+            const endpoint = currentGenerationType === 'story' ? '/generate-story' : '/generate-epic';
+            const payload = currentGenerationType === 'story' 
+                ? { requirements: input, context: context }
+                : { theme: input, objectives: context };
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            resultDiv.innerHTML = `<div class="generated-content">${data.content.replace(/\n/g, '<br>')}</div>`;
+            
+            // Add button to use generated content
+            const useBtn = document.createElement('button');
+            useBtn.className = 'btn btn-success';
+            useBtn.innerHTML = '<i class="fas fa-check"></i> Use This Content';
+            useBtn.onclick = () => useGeneratedContent(data.content);
+            resultDiv.appendChild(useBtn);
+            
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+        }
+        
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-magic"></i> Generate';
+    });
+    
+    function useGeneratedContent(content) {
+        if (currentGenerationType === 'story') {
+            openModal('storyModal');
+            // Parse and fill the story form
+            const lines = content.split('\n');
+            const summary = lines.find(line => line.includes('As a')) || 'Generated User Story';
+            document.getElementById('storySummary').value = summary.replace(/^\d+\.\s*/, '');
+            document.getElementById('storyDescription').value = content;
+        } else {
+            openModal('epicModal');
+            // Parse and fill the epic form
+            const lines = content.split('\n');
+            const title = lines[0] || 'Generated Epic';
+            document.getElementById('epicSummary').value = title.replace(/^\d+\.\s*/, '');
+            document.getElementById('epicDescription').value = content;
+        }
+    }
+    
+    // Form submissions
+    document.getElementById('storyForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        await createIssue('Story', 'storyModal');
+    });
+    
+    document.getElementById('epicForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        await createIssue('Epic', 'epicModal');
+    });
+    
+    async function createIssue(type, modalId) {
+        const isStory = type === 'Story';
+        const summary = document.getElementById(isStory ? 'storySummary' : 'epicSummary').value;
+        const description = document.getElementById(isStory ? 'storyDescription' : 'epicDescription').value;
+        const assignee = document.getElementById(isStory ? 'storyAssignee' : 'epicAssignee').value;
+        
+        try {
+            const response = await fetch('/create-issue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    project_key: projectKey,
+                    issue_type: type,
+                    summary: summary,
+                    description: description,
+                    assignee: assignee || null
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert(`${type} created successfully: ${result.issue_key}`);
+                closeModal(modalId);
+                location.reload(); // Refresh to show new issue
+            } else {
+                alert(`Error creating ${type}: ${result.error}`);
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Jira BA Assistant{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <h1>Business Analyst Dashboard</h1>
+        <p>Select a project to start creating user stories and epics</p>
+    </div>
+
+    <div class="projects-grid">
+        {% for project in projects %}
+        <div class="project-card">
+            <div class="project-icon">
+                {% if project.avatarUrls and project.avatarUrls['48x48'] %}
+                    <img src="{{ project.avatarUrls['48x48'] }}" alt="{{ project.name }}">
+                {% else %}
+                    <i class="fas fa-project-diagram"></i>
+                {% endif %}
+            </div>
+            <div class="project-info">
+                <h3>{{ project.name }}</h3>
+                <p>{{ project.key }}</p>
+                <small>{{ project.projectTypeKey | title }}</small>
+            </div>
+            <div class="project-actions">
+                <a href="{{ url_for('project_dashboard', project_key=project.key, name=project.name) }}" 
+                   class="btn btn-primary">
+                    <i class="fas fa-arrow-right"></i> Open Project
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not projects %}
+    <div class="empty-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h3>No Projects Found</h3>
+        <p>Please check your Jira configuration and ensure you have access to projects.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
